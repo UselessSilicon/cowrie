@@ -87,12 +87,129 @@ class Command_git(HoneyPotCommand):
                     "fatal: not a git repository (or any of the parent directories): .git\n"
                 )
 
+        elif subcommand == "add":
+            pname = self.fs.resolve_path(".git", path)
+            if self.fs.exists(pname):
+                # Silently succeed (git add doesn't output anything on success)
+                pass
+            else:
+                self.write(
+                    "fatal: not a git repository (or any of the parent directories): .git\n"
+                )
+
+        elif subcommand == "commit":
+            pname = self.fs.resolve_path(".git", path)
+            if self.fs.exists(pname):
+                # Check for -m flag
+                if len(self.args) > 1 and self.args[1] == "-m":
+                    self.write("[master abc1234] ")
+                    if len(self.args) > 2:
+                        self.write(f"{self.args[2]}\n")
+                    else:
+                        self.write("commit message\n")
+                    self.write(" 1 file changed, 1 insertion(+), 0 deletions(-)\n")
+                else:
+                    self.errorWrite(
+                        "error: gpg failed to sign the data\nfatal: failed to write commit object\n"
+                    )
+            else:
+                self.write(
+                    "fatal: not a git repository (or any of the parent directories): .git\n"
+                )
+
+        elif subcommand == "push":
+            pname = self.fs.resolve_path(".git", path)
+            if self.fs.exists(pname):
+                self.write("Enumerating objects: 3, done.\n")
+                self.write("Counting objects: 100% (3/3), done.\n")
+                self.write("Writing objects: 100% (3/3), 256 bytes | 256.00 KiB/s, done.\n")
+                self.write("Total 3 (delta 0), reused 0 (delta 0)\n")
+                self.write("To origin\n")
+                self.write("   abc1234..def5678  master -> master\n")
+            else:
+                self.write(
+                    "fatal: not a git repository (or any of the parent directories): .git\n"
+                )
+
+        elif subcommand == "pull":
+            pname = self.fs.resolve_path(".git", path)
+            if self.fs.exists(pname):
+                self.write("Already up to date.\n")
+            else:
+                self.write(
+                    "fatal: not a git repository (or any of the parent directories): .git\n"
+                )
+
+        elif subcommand == "log":
+            pname = self.fs.resolve_path(".git", path)
+            if self.fs.exists(pname):
+                self.write("commit abc1234567890def1234567890abcdef12345678\n")
+                self.write("Author: User <user@example.com>\n")
+                self.write("Date:   Mon Jan 1 12:00:00 2024 +0000\n\n")
+                self.write("    Initial commit\n")
+            else:
+                self.write(
+                    "fatal: not a git repository (or any of the parent directories): .git\n"
+                )
+
+        elif subcommand == "branch":
+            pname = self.fs.resolve_path(".git", path)
+            if self.fs.exists(pname):
+                self.write("* master\n")
+            else:
+                self.write(
+                    "fatal: not a git repository (or any of the parent directories): .git\n"
+                )
+
+        elif subcommand == "checkout":
+            pname = self.fs.resolve_path(".git", path)
+            if self.fs.exists(pname):
+                if len(self.args) > 1:
+                    branch = self.args[1]
+                    self.write(f"Switched to branch '{branch}'\n")
+                else:
+                    self.errorWrite(
+                        "error: pathspec '' did not match any file(s) known to git\n"
+                    )
+            else:
+                self.write(
+                    "fatal: not a git repository (or any of the parent directories): .git\n"
+                )
+
+        elif subcommand == "diff":
+            pname = self.fs.resolve_path(".git", path)
+            if self.fs.exists(pname):
+                # Empty output means no changes
+                pass
+            else:
+                self.write(
+                    "fatal: not a git repository (or any of the parent directories): .git\n"
+                )
+
+        elif subcommand == "remote":
+            pname = self.fs.resolve_path(".git", path)
+            if self.fs.exists(pname):
+                self.write("origin\n")
+            else:
+                self.write(
+                    "fatal: not a git repository (or any of the parent directories): .git\n"
+                )
+
+        elif subcommand == "config":
+            pname = self.fs.resolve_path(".git", path)
+            if self.fs.exists(pname):
+                # Most config commands don't output anything
+                pass
+            else:
+                self.write(
+                    "fatal: not a git repository (or any of the parent directories): .git\n"
+                )
+
         elif subcommand in ("help", "--help", "-h"):
             self.display_usage()
 
         else:
-            self.write(f"unknown option: {subcommand}\n")
-            self.short_usage()
+            self.write(f"git: '{subcommand}' is not a git command. See 'git --help'.\n")
 
     def short_usage(self):
         self.write(

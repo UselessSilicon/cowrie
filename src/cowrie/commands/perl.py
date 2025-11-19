@@ -84,8 +84,9 @@ class Command_perl(HoneyPotCommand):
             self.exit()
             return
 
-        # Parse options
-        for o, _a in opts:
+        # Parse options and check for -e (execute)
+        execute_code = []
+        for o, a in opts:
             if o in ("-v"):
                 self.version()
                 self.exit()
@@ -94,11 +95,34 @@ class Command_perl(HoneyPotCommand):
                 self.help()
                 self.exit()
                 return
+            elif o in ("-e", "-E"):
+                # Collect code to execute
+                execute_code.append(a)
 
+        # If we have code to execute via -e, log it and exit
+        if execute_code:
+            for code in execute_code:
+                log.msg(
+                    eventid="cowrie.command.input",
+                    realm="perl",
+                    input=code,
+                    format="INPUT (%(realm)s): %(input)s",
+                )
+            self.exit()
+            return
+
+        # Check for script files
         for value in args:
             sourcefile = self.fs.resolve_path(value, self.protocol.cwd)
 
             if self.fs.exists(sourcefile):
+                # Log that a perl script was executed
+                log.msg(
+                    eventid="cowrie.command.success",
+                    realm="perl",
+                    input=f"executed script: {value}",
+                    format="INPUT (%(realm)s): %(input)s",
+                )
                 self.exit()
             else:
                 self.write(

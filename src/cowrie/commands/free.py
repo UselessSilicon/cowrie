@@ -89,7 +89,7 @@ class Command_free(HoneyPotCommand):
 
     def get_free_stats(self) -> dict[str, int]:
         """
-        Get the free stats from /proc
+        Get the free stats from /proc, with fallback to realistic defaults
         """
         needed_keys = [
             "Buffers",
@@ -111,7 +111,17 @@ class Command_free(HoneyPotCommand):
                     if tokens[0] in needed_keys:
                         mem_info_map[tokens[0]] = int(tokens[1].lstrip().split(" ")[0])
         except Exception:
-            pass
+            # Fallback to realistic default values (simulating a 2GB RAM system)
+            mem_info_map = {
+                "MemTotal": 2048000,      # ~2GB
+                "MemFree": 819200,        # ~800MB free
+                "MemAvailable": 1228800,  # ~1.2GB available
+                "Buffers": 102400,        # ~100MB
+                "Cached": 512000,         # ~500MB
+                "SwapTotal": 1048576,     # 1GB swap
+                "SwapFree": 1048576,      # All swap free
+                "Shmem": 20480,           # ~20MB
+            }
 
         # Got a map with all tokens from /proc/meminfo and sizes in KBs
         return mem_info_map

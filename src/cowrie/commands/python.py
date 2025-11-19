@@ -86,8 +86,10 @@ class Command_python(HoneyPotCommand):
             self.exit()
             return
 
-        # Parse options
-        for o, _a in opts:
+        # Parse options and check for -c (execute command)
+        execute_command = None
+        execute_module = None
+        for o, a in opts:
             if o in "-V":
                 self.version()
                 self.exit()
@@ -104,11 +106,46 @@ class Command_python(HoneyPotCommand):
                 self.version()
                 self.exit()
                 return
+            elif o in "-c":
+                execute_command = a
+            elif o in "-m":
+                execute_module = a
 
+        # If we have a command to execute via -c, log it and exit
+        if execute_command:
+            log.msg(
+                eventid="cowrie.command.input",
+                realm="python",
+                input=execute_command,
+                format="INPUT (%(realm)s): %(input)s",
+            )
+            self.exit()
+            return
+
+        # If we have a module to execute via -m, log it and exit
+        if execute_module:
+            log.msg(
+                eventid="cowrie.command.input",
+                realm="python",
+                input=f"module: {execute_module}",
+                format="INPUT (%(realm)s): %(input)s",
+            )
+            self.exit()
+            return
+
+        # Check for script files
         for value in args:
             sourcefile = self.fs.resolve_path(value, self.protocol.cwd)
 
             if self.fs.exists(sourcefile) or value == "-":
+                # Log that a python script was executed
+                if value != "-":
+                    log.msg(
+                        eventid="cowrie.command.success",
+                        realm="python",
+                        input=f"executed script: {value}",
+                        format="INPUT (%(realm)s): %(input)s",
+                    )
                 self.exit()
             else:
                 self.write(
