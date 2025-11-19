@@ -25,12 +25,17 @@ class Command_cat(HoneyPotCommand):
     """
 
     number = False
+    number_nonblank = False
+    show_ends = False
+    show_tabs = False
+    show_nonprinting = False
+    squeeze_blank = False
     linenumber = 1
 
     def start(self) -> None:
         try:
             optlist, args = getopt.gnu_getopt(
-                self.args, "AbeEnstTuv", ["help", "number", "version"]
+                self.args, "AbeEnstTuv", ["help", "number", "number-nonblank", "show-ends", "show-tabs", "show-nonprinting", "squeeze-blank", "version"]
             )
         except getopt.GetoptError as err:
             self.errorWrite(
@@ -46,6 +51,27 @@ class Command_cat(HoneyPotCommand):
                 return
             elif o in ("-n", "--number"):
                 self.number = True
+            elif o in ("-b", "--number-nonblank"):
+                self.number_nonblank = True
+                self.number = False  # -b overrides -n
+            elif o in ("-E", "--show-ends"):
+                self.show_ends = True
+            elif o in ("-T", "--show-tabs"):
+                self.show_tabs = True
+            elif o in ("-s", "--squeeze-blank"):
+                self.squeeze_blank = True
+            elif o in ("-v", "--show-nonprinting"):
+                self.show_nonprinting = True
+            elif o in ("-e"):
+                self.show_ends = True
+                self.show_nonprinting = True
+            elif o in ("-t"):
+                self.show_tabs = True
+                self.show_nonprinting = True
+            elif o in ("-A"):
+                self.show_ends = True
+                self.show_tabs = True
+                self.show_nonprinting = True
 
         if len(args) > 0:
             for arg in args:
@@ -71,7 +97,7 @@ class Command_cat(HoneyPotCommand):
 
     def output(self, inb: bytes | None) -> None:
         """
-        This is the cat output, with optional line numbering
+        This is the cat output, with optional line numbering and formatting
         """
         if inb is None:
             return
@@ -79,11 +105,59 @@ class Command_cat(HoneyPotCommand):
         lines = inb.split(b"\n")
         if lines[-1] == b"":
             lines.pop()
+
+        prev_blank = False
         for line in lines:
-            if self.number:
+            # Squeeze blank lines if requested
+            is_blank = len(line.strip()) == 0
+            if self.squeeze_blank and is_blank and prev_blank:
+                continue
+            prev_blank = is_blank
+
+            # Number lines (skip blank if -b is used)
+            if self.number or (self.number_nonblank and not is_blank):
                 self.write(f"{self.linenumber:>6}  ")
                 self.linenumber = self.linenumber + 1
-            self.writeBytes(line + b"\n")
+
+            # Process the line for special characters
+            if self.show_tabs or self.show_nonprinting:
+                line = self.process_line(line)
+
+            self.writeBytes(line)
+
+            # Show line endings if requested
+            if self.show_ends:
+                self.write("$")
+
+            self.write("\n")
+
+    def process_line(self, line: bytes) -> bytes:
+        """
+        Process line to show tabs and non-printing characters
+        """
+        if not (self.show_tabs or self.show_nonprinting):
+            return line
+
+        result = bytearray()
+        for byte in line:
+            if self.show_tabs and byte == 9:  # Tab character
+                result.extend(b"^I")
+            elif self.show_nonprinting and byte < 32 and byte != 9 and byte != 10:
+                # Show control characters as ^X
+                result.extend(b"^" + bytes([byte + 64]))
+            elif self.show_nonprinting and byte == 127:
+                # DEL character
+                result.extend(b"^?")
+            elif self.show_nonprinting and byte >= 128:
+                # High-bit characters shown as M-
+                result.extend(b"M-")
+                if byte >= 128 + 32 and byte < 127 + 128:
+                    result.append(byte - 128)
+                else:
+                    result.extend(b"^" + bytes([(byte - 128 + 64) % 128]))
+            else:
+                result.append(byte)
+        return bytes(result)
 
     def lineReceived(self, line: str) -> None:
         """
