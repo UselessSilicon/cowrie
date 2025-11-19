@@ -252,6 +252,7 @@ class Command_curl(HoneyPotCommand):
 
         if self.outfile:
             self.outfile = self.fs.resolve_path(self.outfile, self.protocol.cwd)
+            path = None
             if self.outfile:
                 path = os.path.dirname(self.outfile)
             if not path or not self.fs.exists(path) or not self.fs.isdir(path):
@@ -264,8 +265,7 @@ class Command_curl(HoneyPotCommand):
         self.url = url.encode("ascii")
 
         parsed = parse.urlparse(url)
-        if parsed.scheme:
-            scheme = parsed.scheme
+        scheme = parsed.scheme if parsed.scheme else ""
         if scheme != "http" and scheme != "https":
             self.errorWrite(
                 f'curl: (1) Protocol "{scheme}" not supported or disabled in libcurl\n'
@@ -458,6 +458,7 @@ class Command_curl(HoneyPotCommand):
         # error.ConnectingCancelledError,
 
         log.msg(response.printTraceback())
+        errormsg = ""
         if hasattr(response, "getErrorMessage"):  # Exceptions
             errormsg = response.getErrorMessage()
         log.msg(errormsg)
