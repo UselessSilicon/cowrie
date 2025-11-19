@@ -61,8 +61,13 @@ class Command_hostname(HoneyPotCommand):
 
         # If trying to set hostname (args provided)
         if args and not any([show_fqdn, show_short, show_ip, show_all_fqdn, show_domain]):
-            # Attackers sometimes try to set hostname, but we'll deny it
-            self.write("hostname: you must be root to change the host name\n")
+            username = self.protocol.user.username
+            if username != "root":
+                # Not root - show realistic error message
+                self.write("hostname: you must be root to change the host name\n")
+                return
+            # Root user - pretend to succeed (but don't actually change anything)
+            # Silently return without error to maintain honeypot realism
             return
 
         # Handle different display options
