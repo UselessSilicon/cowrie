@@ -34,35 +34,35 @@ class Command_hostnamectl(HoneyPotCommand):
             self.show_status()
         elif action == "set-hostname":
             if len(self.args) < 2:
-                self.errorWrite("hostnamectl: set-hostname requires an argument\n")
+                self.write("hostnamectl: set-hostname requires an argument\n")
                 return
             self.set_hostname(self.args[1])
         elif action == "set-icon-name":
             if len(self.args) < 2:
-                self.errorWrite("hostnamectl: set-icon-name requires an argument\n")
+                self.write("hostnamectl: set-icon-name requires an argument\n")
                 return
             self.set_icon_name(self.args[1])
         elif action == "set-chassis":
             if len(self.args) < 2:
-                self.errorWrite("hostnamectl: set-chassis requires an argument\n")
+                self.write("hostnamectl: set-chassis requires an argument\n")
                 return
             self.set_chassis(self.args[1])
         elif action == "set-deployment":
             if len(self.args) < 2:
-                self.errorWrite("hostnamectl: set-deployment requires an argument\n")
+                self.write("hostnamectl: set-deployment requires an argument\n")
                 return
             # Require root
             if self.protocol.user.username != "root":
-                self.errorWrite("Failed to set deployment: Access denied\n")
+                self.write("Failed to set deployment: Access denied\n")
         elif action == "set-location":
             if len(self.args) < 2:
-                self.errorWrite("hostnamectl: set-location requires an argument\n")
+                self.write("hostnamectl: set-location requires an argument\n")
                 return
             # Require root
             if self.protocol.user.username != "root":
-                self.errorWrite("Failed to set location: Access denied\n")
+                self.write("Failed to set location: Access denied\n")
         else:
-            self.errorWrite(f"hostnamectl: unknown operation '{action}'\n")
+            self.write(f"hostnamectl: unknown operation '{action}'\n")
 
     def show_help(self) -> None:
         """Show hostnamectl help"""
@@ -121,7 +121,7 @@ Commands:
         """Set hostname"""
         # Check root privileges
         if self.protocol.user.username != "root":
-            self.errorWrite("Failed to set hostname: Access denied\n")
+            self.write("Failed to set hostname: Access denied\n")
             return
 
         # Set the hostname
@@ -132,7 +132,7 @@ Commands:
         """Set icon name"""
         # Check root privileges
         if self.protocol.user.username != "root":
-            self.errorWrite("Failed to set icon name: Access denied\n")
+            self.write("Failed to set icon name: Access denied\n")
             return
         # Success - no output
 
@@ -140,7 +140,7 @@ Commands:
         """Set chassis type"""
         # Check root privileges
         if self.protocol.user.username != "root":
-            self.errorWrite("Failed to set chassis: Access denied\n")
+            self.write("Failed to set chassis: Access denied\n")
             return
 
         # Validate chassis type
@@ -156,7 +156,7 @@ Commands:
             "container",
         ]
         if chassis not in valid_chassis:
-            self.errorWrite(
+            self.write(
                 f"Failed to set chassis: Invalid chassis type '{chassis}'\n"
             )
             return

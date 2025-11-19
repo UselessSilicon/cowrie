@@ -121,31 +121,31 @@ class Command_systemctl(HoneyPotCommand):
             self.show_status(service)
         elif action in ("start", "stop", "restart", "reload"):
             if len(self.args) < 2:
-                self.errorWrite(f"systemctl {action}: missing service name\n")
+                self.write(f"systemctl {action}: missing service name\n")
                 return
             self.service_action(action, self.args[1])
         elif action in ("enable", "disable"):
             if len(self.args) < 2:
-                self.errorWrite(f"systemctl {action}: missing service name\n")
+                self.write(f"systemctl {action}: missing service name\n")
                 return
             self.service_enable_disable(action, self.args[1])
         elif action == "is-active":
             if len(self.args) < 2:
-                self.errorWrite("systemctl is-active: missing service name\n")
+                self.write("systemctl is-active: missing service name\n")
                 return
             self.is_active(self.args[1])
         elif action == "is-enabled":
             if len(self.args) < 2:
-                self.errorWrite("systemctl is-enabled: missing service name\n")
+                self.write("systemctl is-enabled: missing service name\n")
                 return
             self.is_enabled(self.args[1])
         elif action == "daemon-reload":
             # Daemon reload always requires root
             if self.protocol.user.username != "root":
-                self.errorWrite("Failed to reload daemon: Access denied\n")
+                self.write("Failed to reload daemon: Access denied\n")
             # Otherwise succeed silently
         else:
-            self.errorWrite(f"Unknown operation '{action}'.\n")
+            self.write(f"Unknown operation '{action}'.\n")
 
     def show_help(self) -> None:
         """Show systemctl help"""
@@ -295,7 +295,7 @@ Options:
         """Handle start/stop/restart/reload"""
         # Check root privileges
         if self.protocol.user.username != "root":
-            self.errorWrite(f"Failed to {action} {service}: Access denied\n")
+            self.write(f"Failed to {action} {service}: Access denied\n")
             return
 
         # Normalize service name
@@ -303,7 +303,7 @@ Options:
             service = f"{service}.service"
 
         if service not in SYSTEMD_UNITS:
-            self.errorWrite(
+            self.write(
                 f"Failed to {action} {service}: Unit {service} not found.\n"
             )
             return
@@ -315,7 +315,7 @@ Options:
         """Handle enable/disable"""
         # Check root privileges
         if self.protocol.user.username != "root":
-            self.errorWrite(f"Failed to {action} unit: Access denied\n")
+            self.write(f"Failed to {action} unit: Access denied\n")
             return
 
         # Normalize service name
@@ -323,7 +323,7 @@ Options:
             service = f"{service}.service"
 
         if service not in SYSTEMD_UNITS:
-            self.errorWrite(
+            self.write(
                 f"Failed to {action} unit: Unit file {service} does not exist.\n"
             )
             return

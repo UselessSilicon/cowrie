@@ -89,7 +89,7 @@ class Command_killall(HoneyPotCommand):
                     signal = self.args[i + 1]
                     i += 1
                 else:
-                    self.errorWrite("killall: option requires an argument -- 's'\n")
+                    self.write("killall: option requires an argument -- 's'\n")
                     return
             elif arg.startswith("-") and len(arg) > 1 and not arg.startswith("--"):
                 # Could be -9 or other signal
@@ -101,7 +101,7 @@ class Command_killall(HoneyPotCommand):
             i += 1
 
         if not process_names:
-            self.errorWrite("killall: no process selection criteria\n")
+            self.write("killall: no process selection criteria\n")
             return
 
         # Simulate killing processes

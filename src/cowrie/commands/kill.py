@@ -77,7 +77,7 @@ class Command_kill(HoneyPotCommand):
 
     def call(self) -> None:
         if not self.args:
-            self.errorWrite(
+            self.write(
                 "kill: usage: kill [-s sigspec | -n signum | -sigspec] pid | jobspec "
                 "... or kill -l [sigspec]\n"
             )
@@ -120,7 +120,7 @@ class Command_kill(HoneyPotCommand):
                         i += 2
                         continue
                     else:
-                        self.errorWrite("kill: option requires an argument -- 's'\n")
+                        self.write("kill: option requires an argument -- 's'\n")
                         return
                 elif arg.startswith("-") and not arg[1:].isdigit():
                     # Handle -SIGNAL format
@@ -136,7 +136,7 @@ class Command_kill(HoneyPotCommand):
                             i += 2
                             continue
                     else:
-                        self.errorWrite(f"kill: invalid signal specification: {arg}\n")
+                        self.write(f"kill: invalid signal specification: {arg}\n")
                         return
                     i += 1
                 elif arg.startswith("-") and arg[1:].isdigit():
@@ -149,7 +149,7 @@ class Command_kill(HoneyPotCommand):
                     i += 1
 
         except Exception as e:
-            self.errorWrite(f"kill: {e}\n")
+            self.write(f"kill: {e}\n")
             return
 
         # If -l was specified without arguments, show full list
@@ -160,37 +160,37 @@ class Command_kill(HoneyPotCommand):
         # Validate signal
         if signal.isdigit():
             if signal not in SIGNALS:
-                self.errorWrite(f"kill: invalid signal number: {signal}\n")
+                self.write(f"kill: invalid signal number: {signal}\n")
                 return
         else:
             sig_name = signal.upper()
             if sig_name.startswith("SIG"):
                 sig_name = sig_name[3:]
             if sig_name not in SIGNALS:
-                self.errorWrite(f"kill: invalid signal: {signal}\n")
+                self.write(f"kill: invalid signal: {signal}\n")
                 return
 
         # Process PIDs
         if not pids:
-            self.errorWrite("kill: no process ID specified\n")
+            self.write("kill: no process ID specified\n")
             return
 
         for pid in pids:
             # Validate PID format
             if not pid.lstrip("-").isdigit():
-                self.errorWrite(f"kill: invalid process id: {pid}\n")
+                self.write(f"kill: invalid process id: {pid}\n")
                 continue
 
             pid_num = int(pid)
 
             # Check for special PIDs
             if pid_num == 1:
-                self.errorWrite(f"kill: ({pid_num}) - Operation not permitted\n")
+                self.write(f"kill: ({pid_num}) - Operation not permitted\n")
             elif pid_num < 1:
-                self.errorWrite(f"kill: ({pid_num}) - No such process\n")
+                self.write(f"kill: ({pid_num}) - No such process\n")
             elif pid_num < 300:
                 # System processes - permission denied
-                self.errorWrite(f"kill: ({pid_num}) - Operation not permitted\n")
+                self.write(f"kill: ({pid_num}) - Operation not permitted\n")
             else:
                 # Would kill the process (but we just pretend it worked)
                 # No output means success

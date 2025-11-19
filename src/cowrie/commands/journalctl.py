@@ -104,7 +104,7 @@ class Command_journalctl(HoneyPotCommand):
                         lines = int(self.args[i + 1])
                         i += 1
                     except ValueError:
-                        self.errorWrite(
+                        self.write(
                             f"journalctl: invalid line count: {self.args[i + 1]}\n"
                         )
                         return
@@ -113,21 +113,21 @@ class Command_journalctl(HoneyPotCommand):
                 try:
                     lines = int(arg[2:])
                 except ValueError:
-                    self.errorWrite(f"journalctl: invalid line count: {arg[2:]}\n")
+                    self.write(f"journalctl: invalid line count: {arg[2:]}\n")
                     return
             elif arg in ("-u", "--unit"):
                 if i + 1 < len(self.args):
                     unit = self.args[i + 1]
                     i += 1
                 else:
-                    self.errorWrite("journalctl: option requires an argument -- 'u'\n")
+                    self.write("journalctl: option requires an argument -- 'u'\n")
                     return
             elif arg == "--since":
                 if i + 1 < len(self.args):
                     # Consume the argument but don't use it in this simple implementation
                     i += 1
                 else:
-                    self.errorWrite(
+                    self.write(
                         "journalctl: option requires an argument -- 'since'\n"
                     )
                     return
