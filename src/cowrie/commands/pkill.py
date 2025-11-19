@@ -71,10 +71,6 @@ class Command_pkill(HoneyPotCommand):
             elif arg.startswith("-") and len(arg) > 1 and arg[1:].isdigit():
                 # -9 format
                 signal = arg[1:]
-            elif arg == "-" and i + 1 < len(self.args):
-                # - followed by signal number
-                signal = self.args[i + 1]
-                i += 1
             elif not arg.startswith("-"):
                 pattern = arg
             i += 1

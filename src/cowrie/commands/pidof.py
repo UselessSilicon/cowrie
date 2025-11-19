@@ -114,9 +114,7 @@ class Command_pidof(HoneyPotCommand):
 
             # Filter omitted PIDs
             if omit_pids:
-                pids = [
-                    pid for pid in pids if str(pid) not in omit_pids and pid not in omit_pids
-                ]
+                pids = [pid for pid in pids if str(pid) not in omit_pids]
 
             if single_shot and pids:
                 all_pids.append(pids[0])
