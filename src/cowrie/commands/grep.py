@@ -146,11 +146,11 @@ class Command_grep(HoneyPotCommand):
 
         # Get file contents
         try:
-            contents = self.fs.getfile(path)
+            contents = self.fs.file_contents(path)
             if not contents:
                 return
 
-            text = contents[0].decode("utf-8", errors="ignore") if isinstance(contents[0], bytes) else contents[0]
+            text = contents.decode("utf-8", errors="ignore") if isinstance(contents, bytes) else str(contents)
             lines = text.split("\n")
 
             matches = []

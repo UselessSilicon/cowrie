@@ -48,7 +48,8 @@ class Output(cowrie.core.output.Output):
             self.send_method = SEND_METHODS["lpush"]
 
     def stop(self):
-        pass
+        if hasattr(self, 'redis') and self.redis:
+            self.redis.close()
 
     def write(self, event):
         """

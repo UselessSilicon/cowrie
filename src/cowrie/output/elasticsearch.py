@@ -112,7 +112,8 @@ class Output(cowrie.core.output.Output):
             self.es.ingest.put_pipeline(id=self.pipeline, body=body)
 
     def stop(self):
-        pass
+        if hasattr(self, 'es') and self.es:
+            self.es.close()
 
     def write(self, event):
         for i in list(event.keys()):
