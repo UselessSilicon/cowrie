@@ -27,40 +27,49 @@ class Command_chattr(HoneyPotCommand):
             self.write("Usage: chattr [-RVf] [-+=AacDdeijsSu] [-v version] files...\n")
             return
 
-        try:
-            # Parse options
-            optlist, args = getopt.getopt(self.args, "RVfv:+=AacDdeijsSu")
-        except getopt.GetoptError as err:
-            self.write(f"chattr: {err}\n")
-            return
+        # Manually parse arguments since chattr uses non-getopt style modes like "+i"
+        recursive = False
+        verbose = False
+        operation = None
+        attributes = []
+        files = []
+        skip_next = False
 
-        if not args:
+        for i, arg in enumerate(self.args):
+            if skip_next:
+                skip_next = False
+                continue
+
+            # Handle getopt-style options
+            if arg == "-R":
+                recursive = True
+            elif arg == "-V":
+                verbose = True
+            elif arg == "-f":
+                pass  # Force, suppress most error messages
+            elif arg == "-v":
+                # Next argument is version number, skip it
+                skip_next = True
+            # Handle mode specifiers like +i, -a, =aAcCdDeijsStTu
+            elif arg.startswith(("+", "=")) and len(arg) > 1:
+                # Mode specifications starting with + or =
+                operation = arg[0]
+                attributes.append(arg[1:])
+            elif arg.startswith("-") and len(arg) > 1 and arg[1].isalpha():
+                # Mode specification starting with - (but not option like -R)
+                # e.g., -i for removing immutable attribute
+                operation = arg[0]
+                attributes.append(arg[1:])
+            else:
+                # It's a filename
+                files.append(arg)
+
+        if not files:
             self.write("Usage: chattr [-RVf] [-+=AacDdeijsSu] [-v version] files...\n")
             return
 
-        # Extract operation and attributes
-        operation = None
-        attributes = []
-        recursive = False
-        verbose = False
-
-        for opt, arg in optlist:
-            if opt == "-R":
-                recursive = True
-            elif opt == "-V":
-                verbose = True
-            elif opt == "-f":
-                pass  # Force, suppress most error messages
-            elif opt == "-v":
-                pass  # Version number, ignored
-            else:
-                # Attribute operations (+, -, =, followed by attribute letters)
-                if opt.startswith(("+", "-", "=")):
-                    operation = opt[0]
-                    attributes.append(opt[1:])
-
         # Process each file
-        for filename in args:
+        for filename in files:
             path = self.fs.resolve_path(filename, self.protocol.cwd)
 
             # Check if file exists

@@ -90,7 +90,7 @@ class Command_who(HoneyPotCommand):
             self.write(f"{username:<8} {terminal:<12} {login_time} ({src_ip})\n")
         else:
             # Standard format with idle time
-            self.write(f"{username:<8} {terminal:<12} {login_time}   .     {self.protocol.terminal.transport.sessionno:<5} ({src_ip})\n")
+            self.write(f"{username:<8} {terminal:<12} {login_time}   .     {self.protocol.sessionno:<5} ({src_ip})\n")
 
 
 commands["/usr/bin/who"] = Command_who
