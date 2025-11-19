@@ -46,7 +46,9 @@ class Output(cowrie.core.output.Output):
         )
 
     def stop(self):
-        pass
+        if hasattr(self, 'outfile') and self.outfile:
+            self.outfile.flush()
+            self.outfile.close()
 
     def write(self, event):
         if self.format == "cef":

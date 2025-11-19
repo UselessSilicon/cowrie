@@ -126,6 +126,7 @@ class HoneypotPasswordChecker:
             authname = getattr(modules[authmodule], authclass)
         else:
             log.msg(f"auth_class: {authclass} not found in {authmodule}")
+            return False
 
         theauth = authname()
 
