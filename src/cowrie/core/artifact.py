@@ -60,7 +60,7 @@ class Artifact:
         etrace: TracebackType | None,
     ) -> bool:
         self.close()
-        return True
+        return False
 
     def write(self, data: bytes) -> None:
         self.fp.write(data)

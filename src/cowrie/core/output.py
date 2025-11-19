@@ -73,8 +73,6 @@ def convert(data):
         return data
     if isinstance(data, dict):
         return {convert(key): convert(value) for key, value in list(data.items())}
-    if isinstance(data, dict):
-        return {convert(key): convert(value) for key, value in list(data.items())}
     if isinstance(data, list):
         return [convert(element) for element in data]
     if isinstance(data, bytes):
@@ -180,7 +178,7 @@ class Output(metaclass=abc.ABCMeta):
         if "message" not in event and "format" not in event:
             return
 
-        ev: dict[str, any] = convert(event)  # type: ignore
+        ev: dict[str, Any] = convert(event)  # type: ignore
         ev["sensor"] = self.sensor
         ev["uuid"] = self.uuid
 

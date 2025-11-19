@@ -18,7 +18,7 @@ from twisted.python import failure, log
 
 from cowrie.core.config import CowrieConfig
 from cowrie.shell import fs
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -31,7 +31,7 @@ class HoneyPotCommand:
 
     safeoutfile: str = ""
 
-    def __init__(self, protocol, *args):
+    def __init__(self, protocol: Any, *args: str) -> None:
         self.protocol = protocol
         self.args = list(args)
         self.environ = self.protocol.cmdstack[-1].environ
