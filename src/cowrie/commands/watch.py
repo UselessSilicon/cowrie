@@ -38,12 +38,12 @@ class Command_watch(HoneyPotCommand):
                         interval = float(self.args[i + 1])
                         i += 1
                     except ValueError:
-                        self.errorWrite(
+                        self.write(
                             f"watch: invalid interval '{self.args[i + 1]}'\n"
                         )
                         return
                 else:
-                    self.errorWrite("watch: option requires an argument -- 'n'\n")
+                    self.write("watch: option requires an argument -- 'n'\n")
                     return
             elif arg in ("-d", "--differences"):
                 # Highlight differences - we'll ignore this in our simple implementation
@@ -79,8 +79,8 @@ class Command_watch(HoneyPotCommand):
             i += 1
 
         if not command_args:
-            self.errorWrite("watch: no command specified\n")
-            self.errorWrite("Try 'watch --help' for more information.\n")
+            self.write("watch: no command specified\n")
+            self.write("Try 'watch --help' for more information.\n")
             return
 
         # In a real watch command, this would repeatedly execute the command
