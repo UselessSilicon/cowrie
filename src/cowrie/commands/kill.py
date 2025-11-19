@@ -185,12 +185,12 @@ class Command_kill(HoneyPotCommand):
 
             # Check for special PIDs
             if pid_num == 1:
-                self.write(f"kill: ({pid_num}) - Operation not permitted\n")
+                self.errorWrite(f"kill: ({pid_num}) - Operation not permitted\n")
             elif pid_num < 1:
-                self.write(f"kill: ({pid_num}) - No such process\n")
+                self.errorWrite(f"kill: ({pid_num}) - No such process\n")
             elif pid_num < 300:
                 # System processes - permission denied
-                self.write(f"kill: ({pid_num}) - Operation not permitted\n")
+                self.errorWrite(f"kill: ({pid_num}) - Operation not permitted\n")
             else:
                 # Would kill the process (but we just pretend it worked)
                 # No output means success
