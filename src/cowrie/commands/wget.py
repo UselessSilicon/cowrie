@@ -174,11 +174,33 @@ class Command_wget(HoneyPotCommand):
         self.url = url.encode("utf8")
 
         if self.outfile is None:
-            self.outfile = urldata.path.split("/")[-1]
-            if not len(self.outfile.strip()) or not urldata.path.count("/"):
+            # Extract filename from URL, sanitize to prevent path traversal
+            raw_filename = urldata.path.split("/")[-1]
+            if not len(raw_filename.strip()) or not urldata.path.count("/"):
                 self.outfile = "index.html"
+            else:
+                # Sanitize filename: remove path traversal sequences and dangerous chars
+                # Use only the basename to prevent directory traversal
+                self.outfile = os.path.basename(raw_filename)
+                # Remove any remaining path separators and null bytes
+                self.outfile = self.outfile.replace("/", "_").replace("\\", "_")
+                self.outfile = self.outfile.replace("\x00", "")
+                # Ensure filename is not empty or dangerous
+                if not self.outfile or self.outfile in (".", ".."):
+                    self.outfile = "download"
 
         if self.outfile != "-":
+            # Additional validation: ensure no path traversal in user-provided filename
+            if self.outfile and (".." in self.outfile or self.outfile.startswith("/")):
+                log.msg(
+                    eventid="cowrie.command.wget",
+                    format="Blocked path traversal in wget output filename: %(filename)s",
+                    filename=self.outfile,
+                )
+                self.errorWrite(f"wget: {self.outfile}: Invalid filename\n")
+                self.exit()
+                return
+
             self.outfile = self.fs.resolve_path(self.outfile, self.protocol.cwd)
             path = os.path.dirname(self.outfile)
             if not path or not self.fs.exists(path) or not self.fs.isdir(path):

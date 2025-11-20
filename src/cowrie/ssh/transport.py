@@ -38,6 +38,8 @@ class HoneyPotSSHTransport(transport.SSHServerTransport, TimeoutMixin):
     interactive_timeout: int = CowrieConfig.getint(
         "honeypot", "interactive_timeout", fallback=300
     )
+    # Maximum SSH version string length per RFC 4253 (255 bytes + CR+LF)
+    MAX_VERSION_STRING_LENGTH: int = 260
     ourVersionString: bytes  # set by factory
     transport: Any
     outgoingCompression: Any
@@ -111,9 +113,22 @@ class HoneyPotSSHTransport(transport.SSHServerTransport, TimeoutMixin):
         @type data: C{str}
         """
         self.buf = self.buf + data
+
         if not self.gotVersion:
+            # Enforce maximum version string length to prevent DoS
+            if len(self.buf) > self.MAX_VERSION_STRING_LENGTH:
+                log.msg(
+                    eventid="cowrie.client.size",
+                    format="SSH version string too long (%(size)d bytes), disconnecting",
+                    size=len(self.buf),
+                )
+                self.transport.write(b"SSH version string too long.\n")
+                self.transport.loseConnection()
+                return
+
             if b"\n" not in self.buf:
                 return
+
             self.otherVersionString: bytes = self.buf.split(b"\n")[0].strip()
             log.msg(
                 eventid="cowrie.client.version",

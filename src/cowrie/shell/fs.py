@@ -9,6 +9,7 @@ import configparser
 import errno
 import fnmatch
 import hashlib
+import hmac
 import importlib
 import os
 from pathlib import Path
@@ -41,6 +42,47 @@ T_LINK, T_DIR, T_FILE, T_BLK, T_CHR, T_SOCK, T_FIFO = list(range(0, 7))
 
 
 SPECIAL_PATHS: list[str] = ["/sys", "/proc", "/dev/pts"]
+
+
+def _validate_safe_path(base_dir: str, filename: str) -> str:
+    """
+    Validate that a filename doesn't contain path traversal attempts.
+    Returns a sanitized filename safe to use within base_dir.
+
+    Args:
+        base_dir: The base directory where files should be stored
+        filename: The user-provided filename
+
+    Returns:
+        A safe absolute path within base_dir
+
+    Raises:
+        ValueError: If path traversal is detected
+    """
+    # Remove any directory components, keep only the basename
+    safe_name = os.path.basename(filename)
+
+    # Additional sanitization: remove any remaining path separators
+    safe_name = safe_name.replace("/", "_").replace("\\", "_")
+
+    # Remove any null bytes
+    safe_name = safe_name.replace("\x00", "")
+
+    # Ensure the name is not empty after sanitization
+    if not safe_name or safe_name in (".", ".."):
+        safe_name = "unnamed_file"
+
+    # Create the full path
+    full_path = os.path.join(base_dir, safe_name)
+
+    # Resolve to absolute path and verify it's within base_dir
+    full_path = os.path.abspath(full_path)
+    base_dir = os.path.abspath(base_dir)
+
+    if not full_path.startswith(base_dir + os.sep) and full_path != base_dir:
+        raise ValueError(f"Path traversal detected: {filename}")
+
+    return full_path
 
 
 class _statobj:
@@ -107,19 +149,106 @@ class PermissionDenied(Exception):
 
 
 class HoneyPotFilesystem:
+    def _verify_pickle_security(self, pickle_path: str) -> bool:
+        """
+        Verify pickle file security to prevent arbitrary code execution.
+        Checks file permissions and optionally verifies HMAC signature.
+        """
+        try:
+            # Check if file exists and get stats
+            file_stat = os.stat(pickle_path)
+
+            # Check file permissions - should not be world-writable
+            if file_stat.st_mode & stat.S_IWOTH:
+                log.msg(f"WARNING: Pickle file {pickle_path} is world-writable! This is a security risk.")
+                log.msg("WARNING: Attackers could replace the pickle file with malicious code.")
+                # Continue but warn - operator should fix this
+
+            # Check if file is owned by current user or root
+            current_uid = os.getuid()
+            if file_stat.st_uid not in (current_uid, 0):
+                log.msg(f"WARNING: Pickle file {pickle_path} is owned by different user (UID {file_stat.st_uid})")
+                log.msg("WARNING: This could indicate tampering.")
+
+            # Optional: Check HMAC signature if configured
+            hmac_key = CowrieConfig.get("honeypot", "filesystem_hmac_key", fallback=None)
+            if hmac_key:
+                return self._verify_pickle_hmac(pickle_path, hmac_key)
+
+            return True
+
+        except Exception as e:
+            log.err(e, "ERROR: Failed to verify pickle file security")
+            return False
+
+    def _verify_pickle_hmac(self, pickle_path: str, key: str) -> bool:
+        """
+        Verify HMAC signature of pickle file.
+        Expected format: <32-byte HMAC-SHA256><pickle data>
+        """
+        try:
+            with open(pickle_path, "rb") as f:
+                # Read signature and data
+                signature = f.read(32)
+                if len(signature) < 32:
+                    log.msg("ERROR: Pickle file too small to contain HMAC signature")
+                    return False
+
+                data = f.read()
+
+                # Calculate expected HMAC
+                expected_hmac = hmac.new(
+                    key.encode('utf-8'),
+                    data,
+                    hashlib.sha256
+                ).digest()
+
+                if not hmac.compare_digest(signature, expected_hmac):
+                    log.msg("ERROR: Pickle file HMAC verification failed!")
+                    log.msg("ERROR: File may have been tampered with. Refusing to load.")
+                    return False
+
+                log.msg("Pickle file HMAC verification successful")
+                return True
+
+        except Exception as e:
+            log.err(e, "ERROR: Failed to verify pickle HMAC")
+            return False
+
     def __init__(self, arch: str, home: str) -> None:
         self.fs: list[Any]
 
         try:
-            with open(CowrieConfig.get("shell", "filesystem"), "rb") as f:
+            pickle_path = CowrieConfig.get("shell", "filesystem")
+
+            # Verify pickle file security before loading
+            if not self._verify_pickle_security(pickle_path):
+                log.msg("ERROR: Pickle file failed security verification")
+                # If HMAC is configured and fails, abort
+                if CowrieConfig.get("honeypot", "filesystem_hmac_key", fallback=None):
+                    sys.exit(2)
+                # Otherwise just warn and continue
+
+            with open(pickle_path, "rb") as f:
+                # Skip HMAC signature if present
+                if CowrieConfig.get("honeypot", "filesystem_hmac_key", fallback=None):
+                    f.read(32)  # Skip 32-byte signature
                 self.fs = pickle.load(f)
+
         except UnicodeDecodeError:
-            with open(CowrieConfig.get("shell", "filesystem"), "rb") as f:
+            pickle_path = CowrieConfig.get("shell", "filesystem")
+            with open(pickle_path, "rb") as f:
+                # Skip HMAC signature if present
+                if CowrieConfig.get("honeypot", "filesystem_hmac_key", fallback=None):
+                    f.read(32)
                 self.fs = pickle.load(f, encoding="utf8")
+
         except configparser.NoSectionError:
             log.msg("Loading default pickle file")
             with importlib.resources.open_binary(data, "fs.pickle") as f:
+                # Default pickle file is trusted, no HMAC verification needed
                 self.fs = pickle.load(f)
+
         except Exception as e:
             log.err(e, "ERROR: Failed to load filesystem")
             sys.exit(2)
@@ -465,11 +594,24 @@ class HoneyPotFilesystem:
         if openFlags & os.O_WRONLY == os.O_WRONLY or openFlags & os.O_RDWR == os.O_RDWR:
             # strip executable bit
             hostmode: int = mode & ~(111)
-            hostfile: str = "{}/{}_sftp_{}".format(
-                CowrieConfig.get("honeypot", "download_path"),
-                time.strftime("%Y%m%d-%H%M%S"),
-                re.sub("[^A-Za-z0-9]", "_", filename),
-            )
+
+            # Sanitize filename to prevent path traversal
+            safe_filename = re.sub("[^A-Za-z0-9._-]", "_", os.path.basename(filename))
+            if not safe_filename or safe_filename in (".", ".."):
+                safe_filename = "unnamed_file"
+
+            # Construct safe host file path
+            download_path = CowrieConfig.get("honeypot", "download_path")
+            time_str = time.strftime("%Y%m%d-%H%M%S")
+            hostfile_name = f"{time_str}_sftp_{safe_filename}"
+
+            try:
+                # Use path validation to ensure safety
+                hostfile = _validate_safe_path(download_path, hostfile_name)
+            except ValueError as e:
+                log.msg(f"Path validation failed for SFTP upload: {e}")
+                return None
+
             self.mkfile(filename, 0, 0, 0, stat.S_IFREG | mode)
             fd = os.open(hostfile, openFlags, hostmode)
             self.update_realfile(self.getfile(filename), hostfile)

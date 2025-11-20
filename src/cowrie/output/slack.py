@@ -64,6 +64,35 @@ class Output(cowrie.core.output.Output):
     def stop(self) -> None:
         pass
 
+    @staticmethod
+    def _escape_slack_text(text: str) -> str:
+        """
+        Escape special characters for Slack markdown to prevent injection attacks.
+
+        Slack uses & for escaping: &amp; &lt; &gt;
+        Also escape backticks to prevent breaking out of code blocks.
+
+        Args:
+            text: The text to escape
+
+        Returns:
+            Escaped text safe for Slack markdown
+        """
+        if not isinstance(text, str):
+            text = str(text)
+
+        # Escape in the correct order: & first, then < and >
+        text = text.replace("&", "&amp;")
+        text = text.replace("<", "&lt;")
+        text = text.replace(">", "&gt;")
+
+        # Limit length to prevent DoS
+        max_length = 3000
+        if len(text) > max_length:
+            text = text[:max_length] + "... [truncated]"
+
+        return text
+
     def _format_simplified_message(self, event: dict[str, Any]) -> str:
         """
         Format event into a simplified, readable message with Slack formatting
@@ -98,44 +127,51 @@ class Output(cowrie.core.output.Output):
         # Helper function for command formatting
         def _format_command(cmd: str) -> str:
             cmd = cmd.strip()
+            # Escape command to prevent Slack markdown injection
+            escaped_cmd = self._escape_slack_text(cmd)
             if "\n" in cmd or "\r" in cmd:
-                return f"*MULTILINE CMD* : :arrow_down_small: ```{cmd}```"
-            return f"*CMD* : :arrow_forward: `{cmd}`"
+                return f"*MULTILINE CMD* : :arrow_down_small: ```{escaped_cmd}```"
+            return f"*CMD* : :arrow_forward: `{escaped_cmd}`"
 
         def _format_download(event: dict[str, Any]) -> str:
-            if event.get("url", "") == "":
-                return f"*FILE* : :page_facing_up: Created file `{event.get('destfile', 'unknown')}` (SHA: `{event.get('shasum', 'unknown')}`)"
-            return f"*FILE* : :inbox_tray: Downloaded URL `{event.get('url', 'unknown')}` to local file (SHA: `{event.get('shasum', 'unknown')}`)"
+            # Escape user-controlled fields
+            destfile = self._escape_slack_text(str(event.get('destfile', 'unknown')))
+            url = self._escape_slack_text(str(event.get('url', 'unknown')))
+            shasum = event.get('shasum', 'unknown')  # SHA is safe, it's hex
 
-        # Dictionary of event handlers
+            if event.get("url", "") == "":
+                return f"*FILE* : :page_facing_up: Created file `{destfile}` (SHA: `{shasum}`)"
+            return f"*FILE* : :inbox_tray: Downloaded URL `{url}` to local file (SHA: `{shasum}`)"
+
+        # Dictionary of event handlers - all user-controlled fields are escaped
         event_handlers = {
             "cowrie.client.connect": lambda: f":large_green_circle: *CONNECT* :large_green_circle: New {event.get('protocol', '').upper()} "
             + f"connection `{event.get('src_ip', 'unknown')}`, port: `{event.get('src_port', 'unknown')}`",
             "cowrie.session.connect": lambda: f":large_green_circle: *CONNECT* :large_green_circle: New {event.get('protocol', '').upper()} "
             + f"connection `{event.get('src_ip', 'unknown')}`, port: `{event.get('src_port', 'unknown')}`",
-            "cowrie.login.success": lambda: f"*LOGIN* : :unlock: *SUCCESS* (`{event.get('username', 'unknown')}`:"
-            + f"`{event.get('password', event.get('key', 'unknown'))}`)",
-            "cowrie.login.failed": lambda: f"*LOGIN* : :lock: *FAILED* (`{event.get('username', 'unknown')}`:"
-            + f"`{event.get('password', event.get('key', 'unknown'))}`)",
-            "cowrie.client.fingerprint": lambda: f"*FINGERPRINT* : :bust_in_silhouette: `{event.get('username', 'unknown')}` | "
+            "cowrie.login.success": lambda: f"*LOGIN* : :unlock: *SUCCESS* (`{self._escape_slack_text(str(event.get('username', 'unknown')))}`:"
+            + f"`{self._escape_slack_text(str(event.get('password', event.get('key', 'unknown'))))}`)",
+            "cowrie.login.failed": lambda: f"*LOGIN* : :lock: *FAILED* (`{self._escape_slack_text(str(event.get('username', 'unknown')))}`:"
+            + f"`{self._escape_slack_text(str(event.get('password', event.get('key', 'unknown'))))}`)",
+            "cowrie.client.fingerprint": lambda: f"*FINGERPRINT* : :bust_in_silhouette: `{self._escape_slack_text(str(event.get('username', 'unknown')))}` | "
             + f":gear: `{event.get('type', 'unknown')}` | :key: `{event.get('fingerprint', 'unknown')}`",
-            "cowrie.client.version": lambda: f"*CLIENT* : :gear: Version `{event.get('version', 'unknown')}`",
-            "cowrie.client.kex": lambda: f"*KEX Config* : :level_slider: Algorithm `{event.get('kexAlgs', 'unknown')}`"
+            "cowrie.client.version": lambda: f"*CLIENT* : :gear: Version `{self._escape_slack_text(str(event.get('version', 'unknown')))}`",
+            "cowrie.client.kex": lambda: f"*KEX Config* : :level_slider: Algorithm `{self._escape_slack_text(str(event.get('kexAlgs', 'unknown')))}`"
             + f"(Hassh = `{event.get('hassh', 'unknown')}`)",
             "cowrie.session.closed": lambda: ":red_circle: *LOGOUT* :red_circle: Session closed - "
             + f"Total duration: `{event.get('duration', 'unknown')}` seconds",
             "cowrie.command.input": lambda: _format_command(event.get("input", "")),
             "cowrie.session.file_download": lambda: _format_download(event),
-            "cowrie.session.file_upload": lambda: f"*FILE* : :outbox_tray: Uploaded file to `{event.get('filename', 'unknown')}` "
+            "cowrie.session.file_upload": lambda: f"*FILE* : :outbox_tray: Uploaded file to `{self._escape_slack_text(str(event.get('filename', 'unknown')))}` "
             + f"(SHA: `{event.get('shasum', 'unknown')}`)",
             "cowrie.direct-tcpip.request": lambda: f"*TCP* : :arrows_counterclockwise: `{event.get('src_ip', 'unknown')}:{event.get('src_port', '???')}` ->"
             + f" `{event.get('dst_ip', 'unknown')}:{event.get('dst_port', '???')}`",
             "cowrie.direct-tcpip.data": lambda: f"*TCP* : :no_entry: Blocked direct-tcp forward request to `{event.get('dst_ip', 'unknown')}:"
             + f"{event.get('dst_port', '???')}` with {len(event.get('data', ''))} bytes of data",
-            "cowrie.command.failed": lambda: f"*CMD* : :arrow_right_hook: *Failed* `{event.get('input', 'unknown')}` > "
-            + f"`{event.get('message', 'unknown')}`",
-            "cowrie.session.file_download_failed": lambda: f"*FILE* : :x: *Download Failed* `{event.get('message', 'unknown')}`",
-            "cowrie.session.file_upload_failed": lambda: f"*FILE* : :x: *Upload Failed* `{event.get('message', 'unknown')}`",
+            "cowrie.command.failed": lambda: f"*CMD* : :arrow_right_hook: *Failed* `{self._escape_slack_text(str(event.get('input', 'unknown')))}` > "
+            + f"`{self._escape_slack_text(str(event.get('message', 'unknown')))}`",
+            "cowrie.session.file_download_failed": lambda: f"*FILE* : :x: *Download Failed* `{self._escape_slack_text(str(event.get('message', 'unknown')))}`",
+            "cowrie.session.file_upload_failed": lambda: f"*FILE* : :x: *Upload Failed* `{self._escape_slack_text(str(event.get('message', 'unknown')))}`",
         }
 
         # Check if we have a handler for this event
@@ -144,6 +180,9 @@ class Output(cowrie.core.output.Output):
 
         # For other events, include the eventid and important details
         details: list[str] = []
+        # Keys that contain user-controlled data and need escaping
+        unsafe_keys = {"input", "message", "username", "password", "url", "filename", "fname", "version", "outfile"}
+
         for key in (
             "input",
             "message",
@@ -161,7 +200,11 @@ class Output(cowrie.core.output.Output):
             "src_port",
         ):
             if event.get(key):
-                details.append(f"{key}: `{event[key]}`")
+                value = event[key]
+                # Escape user-controlled fields
+                if key in unsafe_keys:
+                    value = self._escape_slack_text(str(value))
+                details.append(f"{key}: `{value}`")
 
         if details:
             return f"{base_msg}*{eventid.upper().replace('.', '_')}* : {' | '.join(details)}"

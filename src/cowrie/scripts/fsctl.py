@@ -22,6 +22,7 @@ import cmd
 import copy
 import os
 import pickle
+import subprocess
 import sys
 import time
 from stat import (
@@ -774,7 +775,11 @@ class fseditCmd(cmd.Cmd):
         """
         Clears the screen
         """
-        os.system("clear")
+        try:
+            subprocess.run(["clear"], check=False)
+        except (FileNotFoundError, OSError):
+            # If 'clear' command is not available, try alternative
+            print("\n" * 100)
 
     def emptyline(self) -> bool:
         """

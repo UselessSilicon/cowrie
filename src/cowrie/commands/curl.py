@@ -240,17 +240,39 @@ class Command_curl(HoneyPotCommand):
             if opt[0] == "-o":
                 self.outfile = opt[1]
             if opt[0] == "-O":
-                self.outfile = urldata.path.split("/")[-1]
+                # Extract filename from URL, sanitize to prevent path traversal
+                raw_filename = urldata.path.split("/")[-1]
                 if (
-                    self.outfile is None
-                    or not len(self.outfile.strip())
+                    raw_filename is None
+                    or not len(raw_filename.strip())
                     or not urldata.path.count("/")
                 ):
                     self.write("curl: Remote file name has no length!\n")
                     self.exit()
                     return
+                # Sanitize filename: use only basename
+                self.outfile = os.path.basename(raw_filename)
+                # Remove path separators and null bytes
+                self.outfile = self.outfile.replace("/", "_").replace("\\", "_")
+                self.outfile = self.outfile.replace("\x00", "")
+                # Ensure filename is not empty or dangerous
+                if not self.outfile or self.outfile in (".", ".."):
+                    self.write("curl: Remote file name invalid!\n")
+                    self.exit()
+                    return
 
         if self.outfile:
+            # Additional validation: ensure no path traversal in user-provided filename
+            if ".." in self.outfile or self.outfile.startswith("/"):
+                log.msg(
+                    eventid="cowrie.command.curl",
+                    format="Blocked path traversal in curl output filename: %(filename)s",
+                    filename=self.outfile,
+                )
+                self.write(f"curl: {self.outfile}: Invalid filename\n")
+                self.exit()
+                return
+
             self.outfile = self.fs.resolve_path(self.outfile, self.protocol.cwd)
             path = None
             if self.outfile:

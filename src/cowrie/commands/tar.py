@@ -69,11 +69,44 @@ class Command_tar(HoneyPotCommand):
             return
 
         for f in t:
-            dest = self.fs.resolve_path(f.name.strip("/"), self.protocol.cwd)
+            # Validate tar entry name to prevent path traversal attacks
+            # Strip leading slashes and validate path components
+            safe_name = f.name.strip("/")
+
+            # Check for dangerous path components
+            path_components = safe_name.split("/")
+            if any(component in ("..", ".") or component == "" for component in path_components):
+                # Skip entries with path traversal attempts
+                if verbose:
+                    self.write(f"{f.name}\n")
+                if extract:
+                    log.msg(
+                        eventid="cowrie.command.tar",
+                        format="Blocked path traversal attempt in tar: %(name)s",
+                        name=f.name,
+                    )
+                    self.write(f"tar: Removing leading `../` from member names\n")
+                continue
+
+            # Resolve path and ensure it's under the current working directory
+            dest = self.fs.resolve_path(safe_name, self.protocol.cwd)
+
             if verbose:
                 self.write(f"{f.name}\n")
+
             if not extract or not len(dest):
                 continue
+
+            # Additional check: ensure destination is within allowed paths
+            # This prevents tar entries from escaping the virtual filesystem
+            if not dest.startswith("/"):
+                log.msg(
+                    eventid="cowrie.command.tar",
+                    format="Invalid destination path in tar: %(dest)s",
+                    dest=dest,
+                )
+                continue
+
             if f.isdir():
                 self.fs.mkdir(
                     dest,
